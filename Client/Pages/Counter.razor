@@ -1,0 +1,28 @@
+﻿@page "/counter"
+@inject Grpc.Greeter.GreeterClient Greeter
+
+<PageTitle>Counter</PageTitle>
+
+<h1>Counter for @currentUser</h1>
+
+<p role="status">Current count: @currentCount</p>
+
+<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+
+@code {
+    private int currentCount = 0;
+    private string currentUser = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUser = (await Greeter.SayHelloAsync(new Grpc.HelloRequest
+            {
+                Name = "Cirano"
+            })).Message;
+    }
+
+    private void IncrementCount()
+    {
+        currentCount++;
+    }
+}
