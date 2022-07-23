@@ -16,13 +16,22 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 	options.UseInMemoryDatabase("Users"));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
-builder.Services.AddDefaultIdentity<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = true)
+builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
+{
+	options.SignIn.RequireConfirmedAccount = false;
+})
 	.AddEntityFrameworkStores<ApplicationDbContext>();
 
 builder.Services.AddIdentityServer()
 	.AddApiAuthorization<ApplicationUser, ApplicationDbContext>();
 
 builder.Services.AddAuthentication()
+	.AddGoogle(options =>
+	{
+		var googleConfig = builder.Configuration.GetSection("Authentication:Google");
+		options.ClientId = googleConfig["ClientId"];
+		options.ClientSecret = googleConfig["ClientSecret"];
+	})
 	.AddIdentityServerJwt();
 
 builder.Services.AddControllersWithViews();
