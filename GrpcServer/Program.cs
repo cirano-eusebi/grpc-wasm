@@ -11,10 +11,10 @@ const string CorsPolicy = "AllowAll";
 builder.Services.AddGrpc();
 builder.Services.AddCors(o => o.AddPolicy(CorsPolicy, builder =>
 {
-    builder.AllowAnyOrigin()
-        .AllowAnyMethod()
-        .AllowAnyHeader()
-        .WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding");
+	builder.AllowAnyOrigin()
+		.AllowAnyMethod()
+		.AllowAnyHeader()
+		.WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding");
 }));
 
 var app = builder.Build();
@@ -26,7 +26,7 @@ app.UseCors();
 // Configure the HTTP request pipeline.
 app.UseEndpoints(endpoints =>
 {
-    endpoints.MapGrpcService<GreeterService>().EnableGrpcWeb().RequireCors(CorsPolicy);
+	endpoints.MapGrpcService<GreeterService>().EnableGrpcWeb().RequireCors(CorsPolicy);
 });
 
 // Configure Http/2
