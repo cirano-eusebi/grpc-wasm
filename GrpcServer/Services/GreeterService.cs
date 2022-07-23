@@ -1,8 +1,10 @@
 ﻿using Grpc.Core;
 using grpc_wasm.Grpc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace grpc_server.GrpcServer.Services;
 
+[Authorize]
 public class GreeterService : Greeter.GreeterBase
 {
 	private readonly ILogger<GreeterService> _logger;

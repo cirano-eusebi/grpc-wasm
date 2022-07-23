@@ -23,8 +23,20 @@ builder.Services.AddApiAuthorization();
 
 // Add Grpc
 builder.Services.AddGrpcClient<Greeter.GreeterClient>(o =>
-{
-	o.Address = new Uri("https://localhost:7278");
-}).ConfigurePrimaryHttpMessageHandler(() => new GrpcWebHandler(new HttpClientHandler()));
+	{
+		o.Address = new Uri("https://localhost:7278");
+	})
+	.ConfigurePrimaryHttpMessageHandler(() => new GrpcWebHandler(GrpcWebMode.GrpcWeb, new HttpClientHandler()))
+	.AddCallCredentials(async (context, metadata, sp) =>
+	{
+		var tokenProvider = sp.GetRequiredService<IAccessTokenProvider>();
+		var accessTokenResult = await tokenProvider.RequestAccessToken();
+		if (accessTokenResult.TryGetToken(out var accessToken))
+		{
+			Console.WriteLine(accessToken.GrantedScopes);
+			metadata.Add("Authorization", $"Bearer {accessToken.Value}");
+		}
+	})
+;
 
 await builder.Build().RunAsync();

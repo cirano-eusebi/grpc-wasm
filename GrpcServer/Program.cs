@@ -1,4 +1,9 @@
-﻿using grpc_server.GrpcServer.Services;
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+// See the LICENSE file in the project root for more information.
+
+using grpc_server.GrpcServer.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,11 +22,27 @@ builder.Services.AddCors(o => o.AddPolicy(CorsPolicy, builder =>
 		.WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding");
 }));
 
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+{
+	options.Authority = "https://localhost:7058";
+	options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+	{
+		ValidateIssuer = false,
+		ValidateIssuerSigningKey = false,
+		ValidateAudience = false,
+		ValidateLifetime = true,
+	};
+});
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
 app.UseRouting();
 app.UseGrpcWeb();
 app.UseCors();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Configure the HTTP request pipeline.
 app.UseEndpoints(endpoints =>
