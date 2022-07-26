@@ -2,22 +2,13 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 #nullable disable
 
-using System;
-using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
-using System.Text;
-using System.Text.Encodings.Web;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.Extensions.Options;
 using grpc_wasm.Server.Models;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Authentication;
 
 namespace grpc_wasm.Server.Areas.Identity.Pages.Account
 {
@@ -88,6 +79,10 @@ namespace grpc_wasm.Server.Areas.Identity.Pages.Account
 				return RedirectToPage("./Login", new { ReturnUrl = returnUrl });
 			}
 
+			var props = new AuthenticationProperties();
+			props.StoreTokens(info.AuthenticationTokens);
+			props.IsPersistent = true;
+
 			// Sign in the user with this external login provider if the user already has a login.
 			var result = await _signInManager.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: false, bypassTwoFactor: true);
 			if (result.Succeeded)
@@ -104,13 +99,10 @@ namespace grpc_wasm.Server.Areas.Identity.Pages.Account
 				// Create the account
 				if (info.Principal.HasClaim(c => c.Type == ClaimTypes.Email))
 				{
-					var user = new ApplicationUser();
-					var email = info.Principal.FindFirst(ClaimTypes.Email).Value;
-					await _userStore.SetUserNameAsync(user, email, CancellationToken.None);
-					await _emailStore.SetEmailAsync(user, email, CancellationToken.None);
-
-					if ((await _userManager.CreateAsync(user)).Succeeded && await AddUserLogin(user, email, info, returnUrl))
+					var user = await CreateUser(info);
+					if (user != null)
 					{
+						await _signInManager.SignInAsync(user, isPersistent: false, info.LoginProvider);
 						return LocalRedirect(returnUrl);
 					}
 				}
@@ -119,19 +111,19 @@ namespace grpc_wasm.Server.Areas.Identity.Pages.Account
 				return RedirectToPage("./Login", new { ReturnUrl = returnUrl });
 			}
 		}
-		private async Task<bool> AddUserLogin(ApplicationUser user, string email, UserLoginInfo info, string returnUrl)
+		private async Task<ApplicationUser> CreateUser(ExternalLoginInfo info)
 		{
-			var result = await _userManager.AddLoginAsync(user, info);
-			if (result.Succeeded)
+			var user = new ApplicationUser();
+			var email = info.Principal.FindFirst(ClaimTypes.Email).Value;
+			await _userStore.SetUserNameAsync(user, email, CancellationToken.None);
+			await _emailStore.SetEmailAsync(user, email, CancellationToken.None);
+
+			if ((await _userManager.CreateAsync(user)).Succeeded && (await _userManager.AddLoginAsync(user, info)).Succeeded)
 			{
 				_logger.LogInformation("User created an account using {Name} provider.", info.LoginProvider);
-
-				// Add Claims here.
-
-				await _signInManager.SignInAsync(user, isPersistent: false, info.LoginProvider);
-				return true;
+				return user;
 			}
-			return false;
+			return null;
 		}
 
 		private IUserEmailStore<ApplicationUser> GetEmailStore()

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using grpc_wasm.Server.Data;
 using grpc_wasm.Server.Models;
+using Microsoft.AspNetCore.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,18 +15,21 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 	options.UseSqlite(connectionString)
+	//options.UseInMemoryDatabase("Users")
 );
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
+builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, RandomClaimsFactory>();
 builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
-{
-	options.SignIn.RequireConfirmedAccount = false;
-	options.SignIn.RequireConfirmedEmail = false;
-})
+	{
+		options.SignIn.RequireConfirmedAccount = false;
+		options.SignIn.RequireConfirmedEmail = false;
+	})
+	.AddClaimsPrincipalFactory<RandomClaimsFactory>()
 	.AddEntityFrameworkStores<ApplicationDbContext>();
 
 builder.Services.AddIdentityServer()
-	.AddApiAuthorization<ApplicationUser, ApplicationDbContext>();
+	.AddApiAuthorization<ApplicationUser, ApplicationDbContext>(options => RandomClaimsFactory.ExposeClaims(options));
 
 builder.Services.AddAuthentication()
 	.AddGoogle(options =>
@@ -38,13 +42,11 @@ builder.Services.AddAuthentication()
 		options.Events.OnCreatingTicket = ctx =>
 		{
 			var tokens = ctx.Properties.GetTokens().ToList();
-
 			tokens.Add(new AuthenticationToken()
 			{
 				Name = "TicketCreated",
 				Value = DateTime.UtcNow.ToString()
 			});
-
 			ctx.Properties.StoreTokens(tokens);
 
 			return Task.CompletedTask;
