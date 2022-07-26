@@ -400,3 +400,6 @@ FodyWeavers.xsd
 
 # Dev configs
 appsettings.Development.json
+
+# Dev Databases
+*.db
