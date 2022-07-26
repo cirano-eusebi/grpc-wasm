@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using grpc_wasm.Client;
 using grpc_wasm.Grpc;
 using Grpc.Net.Client.Web;
+using grpc_wasm.GrpcClient;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -21,22 +22,24 @@ builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>().Cre
 
 builder.Services.AddApiAuthorization();
 
-// Add Grpc
+// Add Authenticated Grpc Server
+var grpcSection = builder.Configuration.GetSection("Grpc-server");
+builder.Services.AddScoped<UnauthorizedInterceptor>();
+builder.Services.AddScoped<RedirectAuthorizationHandler>();
 builder.Services.AddGrpcClient<Greeter.GreeterClient>(o =>
 	{
-		o.Address = new Uri("https://localhost:7278");
+		o.Address = new Uri(grpcSection["Url"]);
 	})
-	.ConfigurePrimaryHttpMessageHandler(() => new GrpcWebHandler(GrpcWebMode.GrpcWeb, new HttpClientHandler()))
-	.AddCallCredentials(async (context, metadata, sp) =>
+	.AddInterceptor<UnauthorizedInterceptor>()
+	.ConfigurePrimaryHttpMessageHandler(sp =>
 	{
-		var tokenProvider = sp.GetRequiredService<IAccessTokenProvider>();
-		var accessTokenResult = await tokenProvider.RequestAccessToken();
-		if (accessTokenResult.TryGetToken(out var accessToken))
-		{
-			Console.WriteLine(accessToken.GrantedScopes);
-			metadata.Add("Authorization", $"Bearer {accessToken.Value}");
-		}
-	})
-;
+		var authorizationHandler = sp.GetRequiredService<RedirectAuthorizationHandler>().ConfigureHandler(
+			innerHandler: new HttpClientHandler(),
+			authorizedUrls: new[] { grpcSection["Url"] },
+			scopes: new[] { "grpc-wasm.ServerAPI", "openid", "profile" },
+			returnUrl: $"authentication/login"
+		);
+		return new GrpcWebHandler(GrpcWebMode.GrpcWeb, authorizationHandler);
+	});
 
 await builder.Build().RunAsync();

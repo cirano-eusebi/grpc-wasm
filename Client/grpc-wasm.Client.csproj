@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>$(AssemblyName.Replace(' ', '_'))</AssemblyName>
+    <RootNamespace>grpc_wasm.Client</RootNamespace>
     <DebuggerSupport>true</DebuggerSupport>
     <CopyOutputSymbolsToPublishDirectory>true</CopyOutputSymbolsToPublishDirectory>
   </PropertyGroup>

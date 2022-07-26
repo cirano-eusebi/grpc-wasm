@@ -4,7 +4,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject Grpc.Greeter.GreeterClient Greeter
-@attribute [Authorize]
+@*@attribute [Authorize]*@
 <PageTitle>Counter</PageTitle>
 
 <h1>Counter for @currentUser</h1>
@@ -23,7 +23,7 @@
         currentUser = (await Greeter.SayHelloAsync(new Grpc.HelloRequest
             {
                 Name = authState.User.Identity?.Name ?? "Unknown"
-            })).Message;
+            }))?.Message ?? "Unknown";
     }
 
     private void IncrementCount()

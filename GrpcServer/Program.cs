@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.IdentityModel.Tokens.Jwt;
 using grpc_server.GrpcServer.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
@@ -10,29 +11,43 @@ var builder = WebApplication.CreateBuilder(args);
 // Additional configuration is required to successfully run gRPC on macOS.
 // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
 
-const string CorsPolicy = "AllowAll";
 
 // Add services to the container.
 builder.Services.AddGrpc();
-builder.Services.AddCors(o => o.AddPolicy(CorsPolicy, builder =>
-{
-	builder.AllowAnyOrigin()
-		.AllowAnyMethod()
-		.AllowAnyHeader()
-		.WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding");
-}));
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
-{
-	options.Authority = "https://localhost:7058";
-	options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+const string CorsPolicy = "AllowAll";
+builder.Services.AddCors(o => o.AddPolicy(CorsPolicy, builder => builder
+	.AllowAnyOrigin()
+	.AllowAnyMethod()
+	.AllowAnyHeader()
+	.WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding")
+));
+
+// Add Authz/n
+var authSection = builder.Configuration.GetSection("Authentication");
+builder.Services.AddAuthentication(options =>
 	{
-		ValidateIssuer = false,
-		ValidateIssuerSigningKey = false,
-		ValidateAudience = false,
-		ValidateLifetime = true,
-	};
-});
+		options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+		options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+	})
+	.AddJwtBearer(options =>
+	{
+		options.Authority = authSection["Authority"];
+		options.Audience = authSection["Audience"];
+		options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+		{
+			ValidateIssuerSigningKey = false,
+			ValidIssuers = authSection.GetValue<string[]>("Issuers")
+		};
+		options.SecurityTokenValidators.Clear();
+		options.SecurityTokenValidators.Add(new JwtSecurityTokenHandler
+		{
+			MapInboundClaims = false
+		});
+		options.TokenValidationParameters.NameClaimType = "name";
+		options.TokenValidationParameters.RoleClaimType = "role";
+	});
+
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
@@ -45,10 +60,11 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Configure the HTTP request pipeline.
-app.UseEndpoints(endpoints =>
-{
-	endpoints.MapGrpcService<GreeterService>().EnableGrpcWeb().RequireCors(CorsPolicy);
-});
+app.UseEndpoints(endpoints => endpoints
+	.MapGrpcService<GreeterService>()
+	.EnableGrpcWeb()
+	.RequireCors(CorsPolicy)
+);
 
 // Configure Http/2
 //app.MapGrpcService<GreeterService>().RequireCors(CorsPolicy);
