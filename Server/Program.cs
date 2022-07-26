@@ -33,6 +33,22 @@ builder.Services.AddAuthentication()
 		var googleConfig = builder.Configuration.GetSection("Authentication:Google");
 		options.ClientId = googleConfig["ClientId"];
 		options.ClientSecret = googleConfig["ClientSecret"];
+
+		options.SaveTokens = true;
+		options.Events.OnCreatingTicket = ctx =>
+		{
+			var tokens = ctx.Properties.GetTokens().ToList();
+
+			tokens.Add(new AuthenticationToken()
+			{
+				Name = "TicketCreated",
+				Value = DateTime.UtcNow.ToString()
+			});
+
+			ctx.Properties.StoreTokens(tokens);
+
+			return Task.CompletedTask;
+		};
 	})
 	.AddIdentityServerJwt();
 

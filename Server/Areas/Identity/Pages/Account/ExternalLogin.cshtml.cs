@@ -28,30 +28,21 @@ namespace grpc_wasm.Server.Areas.Identity.Pages.Account
 		private readonly UserManager<ApplicationUser> _userManager;
 		private readonly IUserStore<ApplicationUser> _userStore;
 		private readonly IUserEmailStore<ApplicationUser> _emailStore;
-		private readonly IEmailSender _emailSender;
 		private readonly ILogger<ExternalLoginModel> _logger;
 
 		public ExternalLoginModel(
 			SignInManager<ApplicationUser> signInManager,
 			UserManager<ApplicationUser> userManager,
 			IUserStore<ApplicationUser> userStore,
-			ILogger<ExternalLoginModel> logger,
-			IEmailSender emailSender)
+			ILogger<ExternalLoginModel> logger)
 		{
 			_signInManager = signInManager;
 			_userManager = userManager;
 			_userStore = userStore;
 			_emailStore = GetEmailStore();
 			_logger = logger;
-			_emailSender = emailSender;
 		}
 
-		/// <summary>
-		///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-		///     directly from your code. This API may change or be removed in future releases.
-		/// </summary>
-		[BindProperty]
-		public InputModel Input { get; set; }
 
 		/// <summary>
 		///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
@@ -71,21 +62,6 @@ namespace grpc_wasm.Server.Areas.Identity.Pages.Account
 		/// </summary>
 		[TempData]
 		public string ErrorMessage { get; set; }
-
-		/// <summary>
-		///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-		///     directly from your code. This API may change or be removed in future releases.
-		/// </summary>
-		public class InputModel
-		{
-			/// <summary>
-			///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-			///     directly from your code. This API may change or be removed in future releases.
-			/// </summary>
-			[Required]
-			[EmailAddress]
-			public string Email { get; set; }
-		}
 
 		public IActionResult OnGet() => RedirectToPage("./Login");
 
@@ -126,107 +102,36 @@ namespace grpc_wasm.Server.Areas.Identity.Pages.Account
 			else
 			{
 				// Create the account
-				var email = string.Empty;
 				if (info.Principal.HasClaim(c => c.Type == ClaimTypes.Email))
 				{
-					email = info.Principal.FindFirst(ClaimTypes.Email).Value;
-					var user = CreateUser();
+					var user = new ApplicationUser();
+					var email = info.Principal.FindFirst(ClaimTypes.Email).Value;
 					await _userStore.SetUserNameAsync(user, email, CancellationToken.None);
 					await _emailStore.SetEmailAsync(user, email, CancellationToken.None);
 
-					var createResult = await _userManager.CreateAsync(user);
-					if (createResult.Succeeded)
+					if ((await _userManager.CreateAsync(user)).Succeeded && await AddUserLogin(user, email, info, returnUrl))
 					{
-						return await AddUserLogin(user, email, info, returnUrl);
+						return LocalRedirect(returnUrl);
 					}
 				}
-				// If the user does not have an email associated with the account, then ask the user to create an account.
-				ProviderDisplayName = info.ProviderDisplayName;
-				ReturnUrl = returnUrl;
-				return Page();
-			}
-		}
-
-		public async Task<IActionResult> OnPostConfirmationAsync(string returnUrl = null)
-		{
-			returnUrl = returnUrl ?? Url.Content("~/");
-			// Get the information about the user from the external login provider
-			var info = await _signInManager.GetExternalLoginInfoAsync();
-			if (info == null)
-			{
-				ErrorMessage = "Error loading external login information during confirmation.";
+				// If the user does not have an email associated with the account, then ask the user to login again.
+				// We must be missing some claim.
 				return RedirectToPage("./Login", new { ReturnUrl = returnUrl });
 			}
-
-			if (ModelState.IsValid)
-			{
-				var user = CreateUser();
-
-				await _userStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
-				await _emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
-
-				var result = await _userManager.CreateAsync(user);
-				if (result.Succeeded)
-				{
-					return await AddUserLogin(user, Input.Email, info, returnUrl);
-				}
-				foreach (var error in result.Errors)
-				{
-					ModelState.AddModelError(string.Empty, error.Description);
-				}
-			}
-
-			ProviderDisplayName = info.ProviderDisplayName;
-			ReturnUrl = returnUrl;
-			return Page();
 		}
-
-		private ApplicationUser CreateUser()
-		{
-			try
-			{
-				return Activator.CreateInstance<ApplicationUser>();
-			}
-			catch
-			{
-				throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'. " +
-					$"Ensure that '{nameof(ApplicationUser)}' is not an abstract class and has a parameterless constructor, or alternatively " +
-					$"override the external login page in /Areas/Identity/Pages/Account/ExternalLogin.cshtml");
-			}
-		}
-
-		private async Task<IActionResult> AddUserLogin(ApplicationUser user, string email, UserLoginInfo info, string returnUrl)
+		private async Task<bool> AddUserLogin(ApplicationUser user, string email, UserLoginInfo info, string returnUrl)
 		{
 			var result = await _userManager.AddLoginAsync(user, info);
 			if (result.Succeeded)
 			{
 				_logger.LogInformation("User created an account using {Name} provider.", info.LoginProvider);
 
-				var userId = await _userManager.GetUserIdAsync(user);
-				var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-				code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-				var callbackUrl = Url.Page(
-					"/Account/ConfirmEmail",
-					pageHandler: null,
-					values: new { area = "Identity", userId = userId, code = code },
-					protocol: Request.Scheme);
-
-				await _emailSender.SendEmailAsync(email, "Confirm your email",
-					$"Please confirm your account by <a href='{HtmlEncoder.Default.Encode(callbackUrl)}'>clicking here</a>.");
-
-				// If account confirmation is required, we need to show the link if we don't have a real email sender
-				if (_userManager.Options.SignIn.RequireConfirmedAccount)
-				{
-					return RedirectToPage("./RegisterConfirmation", new { Email = email });
-				}
+				// Add Claims here.
 
 				await _signInManager.SignInAsync(user, isPersistent: false, info.LoginProvider);
-				return LocalRedirect(returnUrl);
+				return true;
 			}
-
-			ProviderDisplayName = info.ProviderDisplayName;
-			ReturnUrl = returnUrl;
-			return Page();
+			return false;
 		}
 
 		private IUserEmailStore<ApplicationUser> GetEmailStore()
