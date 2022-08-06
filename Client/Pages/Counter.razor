@@ -3,6 +3,7 @@
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
 @using Google.Protobuf.WellKnownTypes
+@inherits CancellableComponent
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject Grpc.Greeter.GreeterClient Greeter
 @attribute [Authorize]
@@ -25,7 +26,19 @@
             {
                 Name = authState.User.Identity?.Name ?? "Unknown"
             }))?.Message ?? "Unknown";
-        currentCount = (await Greeter.GetCounterAsync(new())).Counter;
+
+        // Fire and forget
+        _ = Task.Run(async () =>
+        {
+            using (var call = Greeter.SubscribeToCounter(new() { Delay = 10 }, cancellationToken: CancelTokenSource.Token))
+            {
+                while (await call.ResponseStream.MoveNext(CancelTokenSource.Token))
+                {
+                    currentCount = call.ResponseStream.Current.Counter;
+                    StateHasChanged();
+                }
+            }
+        });
     }
 
     private async Task IncrementCount() => currentCount = (await Greeter.AddOneAsync(new())).Counter;

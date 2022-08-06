@@ -13,6 +13,7 @@ service Greeter {
   rpc SayGoodbye (HelloRequest) returns (HelloReply);
   rpc GetCounter(google.protobuf.Empty) returns (CounterResponse);
   rpc AddOne (google.protobuf.Empty) returns (CounterResponse);
+  rpc SubscribeToCounter (UpdateInterval) returns (stream CounterResponse);
 }
 
 // The request message containing the user's name.
@@ -27,4 +28,8 @@ message HelloReply {
 
 message CounterResponse {
 	int32 counter = 1;
+}
+
+message UpdateInterval {
+	int32 delay = 1;
 }

@@ -43,7 +43,7 @@ public class GreeterService : Greeter.GreeterBase
 	{
 		return Task.FromResult(new CounterResponse
 		{
-			Counter = Cache.GetOrCreate("grpc-counter", k => 0)
+			Counter = GetCounter()
 		});
 	}
 
@@ -52,10 +52,31 @@ public class GreeterService : Greeter.GreeterBase
 		int current;
 		lock (Cache)
 		{
-			current = Cache.GetOrCreate("grpc-counter", k => 0);
+			current = GetCounter();
 			current += 1;
 			Cache.Set("grpc-counter", current);
 		}
 		return Task.FromResult(new CounterResponse { Counter = current });
 	}
+
+	public override async Task SubscribeToCounter(UpdateInterval request, IServerStreamWriter<CounterResponse> responseStream, ServerCallContext context)
+	{
+		var lastCount = 0;
+		while (true)
+		{
+			var currentCount = GetCounter();
+			if (currentCount != lastCount)
+			{
+				await responseStream.WriteAsync(new CounterResponse
+				{
+					Counter = currentCount
+				});
+				lastCount = currentCount;
+			}
+
+			await Task.Delay(request.Delay);
+		}
+	}
+
+	private int GetCounter() => Cache.GetOrCreate("grpc-counter", k => 0);
 }
