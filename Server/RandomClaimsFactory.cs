@@ -16,11 +16,13 @@ internal class RandomClaimsFactory : UserClaimsPrincipalFactory<ApplicationUser>
 
 	internal static ApiAuthorizationOptions ExposeClaims(ApiAuthorizationOptions options)
 	{
-		// Add claims when asking the openid scope
+		// Add custom claims when asking the openid scope
 		options.IdentityResources["openid"].UserClaims.Add("random");
+		options.IdentityResources["openid"].UserClaims.Add(ClaimTypes.Name);
 
 		// Add claims to the access token
 		options.ApiResources.Single().UserClaims.Add("random");
+		options.ApiResources.Single().UserClaims.Add(ClaimTypes.Name);
 
 		return options;
 	}
@@ -28,8 +30,11 @@ internal class RandomClaimsFactory : UserClaimsPrincipalFactory<ApplicationUser>
 	protected override async Task<ClaimsIdentity> GenerateClaimsAsync(ApplicationUser user)
 	{
 		var id = await base.GenerateClaimsAsync(user);
-		id.AddClaim(new Claim("random", Random.Shared.NextInt64().ToString()));
-
+		id.AddClaims(new List<Claim>()
+		{
+			new("random", Random.Shared.NextInt64().ToString()),
+			new(ClaimTypes.Name, id.Name?? "")
+		});
 		return id;
 	}
 }

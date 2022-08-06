@@ -22,8 +22,8 @@
 <p>@randomClaim</p>
 
 @code {
-    private string authMessage;
-    private string randomClaim;
+    private string authMessage = "";
+    private string randomClaim = "";
     private IEnumerable<Claim> claims = Enumerable.Empty<Claim>();
 
     private async Task GetClaimsPrincipalData()
