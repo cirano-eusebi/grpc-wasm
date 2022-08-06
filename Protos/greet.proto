@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "google/protobuf/empty.proto";
+
 option csharp_namespace = "grpc_wasm.Grpc";
 
 package greet;
@@ -9,6 +11,8 @@ service Greeter {
   // Sends a greeting
   rpc SayHello (HelloRequest) returns (HelloReply);
   rpc SayGoodbye (HelloRequest) returns (HelloReply);
+  rpc GetCounter(google.protobuf.Empty) returns (CounterResponse);
+  rpc AddOne (google.protobuf.Empty) returns (CounterResponse);
 }
 
 // The request message containing the user's name.
@@ -19,4 +23,8 @@ message HelloRequest {
 // The response message containing the greetings.
 message HelloReply {
   string message = 1;
+}
+
+message CounterResponse {
+	int32 counter = 1;
 }

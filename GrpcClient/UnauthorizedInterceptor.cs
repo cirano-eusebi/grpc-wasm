@@ -45,7 +45,9 @@ public class UnauthorizedInterceptor : Interceptor
 			if (ex.StatusCode == StatusCode.Unauthenticated)
 			{
 				_logger.LogError(ex, $"Unauthenticated Error thrown by {context.Method}");
+#pragma warning disable CS8603 // Handler needs to return null in order to be considered a failed request
 				return null;
+#pragma warning restore CS8603
 			}
 			throw;
 		}

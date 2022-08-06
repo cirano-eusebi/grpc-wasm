@@ -50,6 +50,9 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
+// Add MemoryCache service
+builder.Services.AddMemoryCache();
+
 var app = builder.Build();
 
 app.UseRouting();

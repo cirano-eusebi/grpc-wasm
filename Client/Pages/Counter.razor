@@ -2,9 +2,10 @@
 @using Microsoft.AspNetCore.Authorization
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
+@using Google.Protobuf.WellKnownTypes
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject Grpc.Greeter.GreeterClient Greeter
-@*@attribute [Authorize]*@
+@attribute [Authorize]
 <PageTitle>Counter</PageTitle>
 
 <h1>Counter for @currentUser</h1>
@@ -24,10 +25,8 @@
             {
                 Name = authState.User.Identity?.Name ?? "Unknown"
             }))?.Message ?? "Unknown";
+        currentCount = (await Greeter.GetCounterAsync(new())).Counter;
     }
 
-    private void IncrementCount()
-    {
-        currentCount++;
-    }
+    private async Task IncrementCount() => currentCount = (await Greeter.AddOneAsync(new())).Counter;
 }
